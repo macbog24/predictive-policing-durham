@@ -1,0 +1,144 @@
+---
+title: "STOR556 Project"
+author: "Austin Dunn"
+date: "4/17/2018"
+output:
+  html_document: default
+  pdf_document: default
+header-includes: \usepackage{amsgen,amsmath,amstext,amsbsy,amsopn,amssymb,mathabx,amsthm,bm,bbm}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if(!require(MASS)) { install.packages("MASS", repos = "http://cran.us.r-project.org"); library(MASS) }
+if(!require(dplyr)) { install.packages("dplyr", repos = "http://cran.us.r-project.org"); library(dplyr) }
+if(!require(ISLR)) { install.packages("ISLR", repos = "http://cran.us.r-project.org"); library(ISLR) }
+if(!require(car)) { install.packages("car", repos = "http://cran.us.r-project.org"); library(car) }
+```
+
+```{r}
+#Import Tidy data
+crimes = read.csv("crimes_tidy.csv")
+```
+
+```{r}
+#Add variable 'night' for crimes that occur between 8pm - 6am
+crimes = mutate(crimes, night = 0)
+crimes$night <- ifelse( crimes$hour_occur >= 20 | crimes$hour_occur <= 5, 1, 0)  
+```
+
+
+```{r}
+#Randomly divide the data into a training and test set with ratio 3:1
+n <- nrow(crimes)
+set.seed(123)
+shuffle <- sample.int(n)
+shuffle <- cut(shuffle, breaks = c(0, quantile(1:n, 0.75), n), labels = c("train", "test"))
+crimes.train <- split(crimes, shuffle)$train
+crimes.test <- split(crimes, shuffle)$test
+```
+
+
+####Logistic Regression
+```{r echo = FALSE}
+crimes.logistic <- glm(night ~ downtown + area + DIST + BIG_ZONE + chrgdesc, data = crimes.train, family = "binomial")
+
+# Compute the confusion matrix
+crimes.logistic.prob <- predict(crimes.logistic, crimes.test, type = "response")
+crimes.logistic.pred <- (crimes.logistic.prob > 0.5)
+crimes.logistic.confusion <- table(Truth   = crimes.test$downtown,
+                                 Predict = crimes.logistic.pred)
+print("Confusion Matrix of Logistic Regression", quote = FALSE)
+addmargins(crimes.logistic.confusion)
+
+# Compute the proportional table
+crimes.logistic.confusion.prop <- prop.table(crimes.logistic.confusion)
+print("Proportional Table of Confusion Matrix", quote = FALSE)
+print(addmargins(crimes.logistic.confusion.prop), digits = 3)
+
+# Compute the row-proportional table
+crimes.logistic.confusion.pred <- prop.table(crimes.logistic.confusion, 1)
+```
+
+####LDA
+```{r echo = FALSE, warning=FALSE}
+crimes.lda <- lda(night ~ downtown + area + DIST + BIG_ZONE + chrgdesc, data = crimes.train)
+
+# Compute the confusion matrix
+crimes.lda.pred <- predict(crimes.lda, crimes.test)$class
+crimes.lda.confusion <- table(Truth   = crimes.test$night,
+                              Predict = crimes.lda.pred)
+print("Confusion Matrix of LDA", quote = FALSE)
+addmargins(crimes.lda.confusion)
+
+# Compute the proportional table
+crimes.lda.confusion.prop <- prop.table(crimes.lda.confusion)
+print("Proportional Table of Confusion Matrix", quote = FALSE)
+print(addmargins(crimes.lda.confusion.prop), digits = 3)
+
+# Compute the row-proportional table
+crimes.lda.confusion.pred <- prop.table(crimes.lda.confusion, 1)
+print("Row-Proportional Table of Confusion Matrix", quote = FALSE)
+print(addmargins(crimes.lda.confusion.pred)[-3,], digits = 3)
+```
+
+
+###QDA
+```{r echo = FALSE, warning=FALSE}
+crimes.qda <- qda(night ~ downtown + area + DIST + BIG_ZONE + chrgdesc, data = crimes.train)
+
+# Compute the confusion matrix
+crimes.qda.pred <- predict(crimes.qda, crimes.test)$class
+crimes.qda.confusion <- table(Truth   = crimes.test$night,
+                              Predict = crimes.qda.pred)
+print("Confusion Matrix of QDA", quote = FALSE)
+addmargins(crimes.qda.confusion)
+
+# Compute the proportional table
+crimes.qda.confusion.prop <- prop.table(crimes.qda.confusion)
+print("Proportional Table of Confusion Matrix", quote = FALSE)
+print(addmargins(crimes.qda.confusion.prop), digits = 3)
+
+# Compute the row-proportional table
+crimes.qda.confusion.pred <- prop.table(crimes.qda.confusion, 1)
+print("Row-Proportional Table of Confusion Matrix", quote = FALSE)
+print(addmargins(crimes.qda.confusion.pred)[-3,], digits = 3)
+```
+
+##### Comparison
+
+Test errors, FPRs and FNRs in all methods above are reported as follows.
+
+|              |**Logistic Regression**|**LDA**|**QDA**|
+|:------------:|:---------------------:|:-----:|:-----:|
+|**Test Error**|`r format(1 - sum(diag(crimes.logistic.confusion.prop)), digits = 3)`|`r format(1 - sum(diag(crimes.lda.confusion.prop)), digits = 3)`|`r format(1 - sum(diag(crimes.qda.confusion.prop)), digits = 3)`|
+|**FPR**       |`r format(crimes.logistic.confusion.pred[1,2], digits = 3)`|`r format(crimes.lda.confusion.pred[1,2], digits = 3)`|`r format(crimes.qda.confusion.pred[1,2], digits = 3)`|
+|**FNR**       |`r format(crimes.logistic.confusion.pred[2,1], digits = 3)`|`r format(crimes.lda.confusion.pred[2,1], digits = 3)`|`r format(crimes.qda.confusion.pred[2,1], digits = 3)`|
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
