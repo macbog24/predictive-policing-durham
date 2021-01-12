@@ -1,0 +1,153 @@
+
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(stringr)
+library(tidyr)
+
+
+# Reading CSV file into R
+crimes <- read.csv("durham_crime.csv", stringsAsFactors = FALSE)
+crimes <- read.csv("crimes_tidy.csv")
+
+# Make the data Tidy:
+crimes <- rename(crimes, "information" = "GeoPoint;inci_id;date_rept;hour_rept;yearstamp;monthstamp;date_occu;dow1;hour_occu;date_fnd;hour_fnd;dow2;reportedas;ucr_code;chrgdesc;csstatus;csstatusdt;addtime;reviewdate;UCR_TYPE_O;DIST;STRDATE;BIG_ZONE")
+
+
+# Separating the second column into several different columns
+crimes <- crimes %>%
+  separate(information, into = c("longitude", "incident_id", "date_rept", "hour_rept", "yearstamp", "monthstamp", "date_occur","dow1", "hour_occur", "data_fnd", "hour_fnd","dow2","reportedas", "ucr_code", "chrgdesc", "csstatus","csstatusdt", "addtime", "reviewdate", "UCR_TYPE_O;DIST", "DIST","STRDATE", "BIG_ZONE"), sep = ";")
+
+
+# Separating date_occur and date_rept into time, month, day, and year
+crimes <- crimes %>%
+  separate(date_occur, into = c("year_occur", "month_occur", "day_occur"), sep = "-") %>%
+  separate(day_occur, into = c("day_occur", "T"), sep = "T") %>%
+  separate(hour_occur, into = c("hour_occur", "minute_occur"), sep = 2) %>%
+  separate(date_rept, into = c("year_rept", "month_rept", "day_rept"), sep = "-") %>%
+  separate(day_rept, into = c("day_rept", "T2"), sep = "T") %>% 
+  separate(hour_rept, into = c("hour_rept", "minute_rept"), sep = 2) %>%
+  select(Latitude, longitude, incident_id, year_rept, month_rept, day_rept, hour_rept, minute_rept, year_occur, month_occur, day_occur, hour_occur, minute_occur, dow1, reportedas, ucr_code, chrgdesc, DIST, BIG_ZONE)
+
+# Used to sort the types of crimes
+sort(unique(crimes$chrgdesc))
+
+
+# Remove RECOVERED STOLEN PROPERTY (OTHER JURISDICTION); RECOVERED STOLEN VEHICLE (OTHER JURISDICTION); UNDISCIPLINED JUVENILE; PROSTITUTION; NON REPORTABLE; DV INFO REPORT (NO CRIME); FOUND PROPERTY; DEATH INVESTIGATION; CRIME SCENE INVESTIGATION; ASSIST OTHER AGENCY; NON-CRIMINAL DETAINMENT (INVOLUNTARY COMMITMENT. Reason for removal: some of these are not crimes ( Recovered property, NON Reportable) and they are small in quantity.
+crimes <- crimes %>%
+  filter(crimes$chrgdesc !="PROSTITUTION" & crimes$chrgdesc !="UNDISCIPLINED JUVENILE" & crimes$chrgdesc != "NON REPORTABLE" & crimes$chrgdesc !="RECOVERED STOLEN PROPERTY (OTHER JURISDICTION)" & crimes$chrgdesc !="RECOVERED STOLEN VEHICLE (OTHER JURISDICTION)" & crimes$chrgdesc != "DV INFO REPORT (NO CRIME)" & crimes$chrgdesc != "FOUND PROPERTY" & crimes$chrgdesc != "DEATH INVESTIGATION" & crimes$chrgdesc != "CRIME SCENE INVESTIGATION" & crimes$chrgdesc != "ASSIST OTHER AGENCY" & crimes$chrgdesc!= "NON-CRIMINAL DETAINMENT (INVOLUNTARY COMMITMENT)")
+
+# Remove crimes that are less than 30
+crimes <- crimes %>%
+  filter(crimes$chrgdesc != "IDENTITY THEFT" & crimes$chrgdesc != "TRESSPASS-LAND UNDER OPTION BY FEDERAL GOVERNMENT" & crimes$chrgdesc != "TRUANCY" & crimes$chrgdesc != "PROSTITUTION - ASSISTING/PROMOTING" & crimes$chrgdesc != "MOTOR VEHICLE THEFT - BUSES" & crimes$chrgdesc != "MOTOR VEHICLE THEFT - RECREATIONAL VEHICLE" & crimes$chrgdesc != "AGGRAVATED ASSAULT WITH SEXUAL MOTIVE" & crimes$chrgdesc != "OFFENSE AGAINST FAMILY - OTHER")
+
+# Grouping crimes together that are under the same subheading
+crimes$chrgdesc[grep("^COUNTERFEITING",crimes$chrgdesc)] <- "FRAUD"
+crimes$chrgdesc[grep("^ALL OTHER",crimes$chrgdesc)] <- "OTHER/WARNING"
+crimes$chrgdesc[grep("^ALL TRAFFIC",crimes$chrgdesc)] <- "VEHICLE CRIME"
+crimes$chrgdesc[grep("^ARSON",crimes$chrgdesc)] <- "PROPERTY OFFENSES (STOLEN/DESTRUCTION)"
+crimes$chrgdesc[grep("^AGGRAV",crimes$chrgdesc)] <- "ASSAULT"
+crimes$chrgdesc[grep("^BURGLARY",crimes$chrgdesc)] <- "PROPERTY OFFENSES (STOLEN/DESTRUCTION)"
+crimes$chrgdesc[grep("^CALLS FOR",crimes$chrgdesc)] <- "OTHER/WARNING"
+crimes$chrgdesc[grep("^DISORDERLY",crimes$chrgdesc)] <- "DISORDERLY CONDUCT"
+crimes$chrgdesc[grep("^DRUG",crimes$chrgdesc)] <- "DRUG/ALCOHOL"
+crimes$chrgdesc[grep("^DRIVING WHILE",crimes$chrgdesc)] <- "DRUG/ALCOHOL"
+crimes$chrgdesc[grep("^EMBEZZLEMENT",crimes$chrgdesc)] <- "FRAUD"
+crimes$chrgdesc[grep("^FORGERY",crimes$chrgdesc)] <- "FRAUD"
+crimes$chrgdesc[grep("^FRAUD",crimes$chrgdesc)] <- "FRAUD"
+crimes$chrgdesc[grep("^HOMICIDE",crimes$chrgdesc)] <- "ASSAULT"
+crimes$chrgdesc[grep("^SUICIDE",crimes$chrgdesc)] <- "ASSAULT"
+crimes$chrgdesc[grep("^LIQUOR LAW",crimes$chrgdesc)] <- "DRUG/ALCOHOL"
+crimes$chrgdesc[grep("^LARCENY",crimes$chrgdesc)] <- "LARCENY"
+crimes$chrgdesc[grep("^LOST PROPERT", crimes$chrgdesc)] <- "PROPERTY OFFENSES (STOLEN/DESTRUCTION)"
+crimes$chrgdesc[grep("^MISSING PERSON",crimes$chrgdesc)] <- "MISSING PERSON"
+crimes$chrgdesc[grep("^MOTOR VEHICLE THEFT",crimes$chrgdesc)] <- "PROPERTY OFFENSES (STOLEN/DESTRUCTION)"
+crimes$chrgdesc[grep("^OBSCENE MATERIAL/PORNOGRAPHY",crimes$chrgdesc)] <- "DISORDERLY CONDUCT"
+crimes$chrgdesc[grep("^OFFENSES AGAINST FAMILY",crimes$chrgdesc)] <- "ASSAULT"
+crimes$chrgdesc[grep("^ROBBERY",crimes$chrgdesc)] <- "PROPERTY OFFENSES (STOLEN/DESTRUCTION)"
+crimes$chrgdesc[grep("^RAPE",crimes$chrgdesc)] <- "ASSAULT"
+crimes$chrgdesc[grep("^RUNAWAY",crimes$chrgdesc)] <- "MISSING PERSON"
+crimes$chrgdesc[grep("^SIMPLE ASSAULT",crimes$chrgdesc)] <- "ASSAULT"
+crimes$chrgdesc[grep("^SEX OFFENSE",crimes$chrgdesc)] <- "ASSAULT"
+crimes$chrgdesc[grep("^STOLEN PROPERTY",crimes$chrgdesc)] <- "PROPERTY OFFENSES (STOLEN/DESTRUCTION)"
+crimes$chrgdesc[grep("^SUSPICIOUS",crimes$chrgdesc)] <- "OTHER/WARNING"
+crimes$chrgdesc[grep("^TOWED",crimes$chrgdesc)] <- "VEHICLE CRIME"
+crimes$chrgdesc[grep("^VANDALISM",crimes$chrgdesc)] <- "PROPERTY OFFENSES (STOLEN/DESTRUCTION)"
+crimes$chrgdesc[grep("^WEAPON VIOLATIONS",crimes$chrgdesc)] <- "DISORDERLY CONDUCT"
+
+
+# Making a column called "other" for various locations
+
+crimes <- crimes %>% as.data.frame() %>% mutate(area = "Other")
+
+for(i in 1:nrow(crimes)){
+  
+  if(crimes[i, 2] >= 35.993320 && crimes[i, 2] <= 36.015883 
+     && crimes[i, 3] <= -78.921818 && crimes[i, 3] >= -78.957312){
+    crimes[i, 21] <- "Duke University"
+  }
+  
+  if(crimes[i, 2] >= 35.990776 && crimes[i, 2] <= 35.995465 
+     && crimes[i, 3] <= -78.901148 && crimes[i, 3] >= -78.906138){
+    crimes[i, 21] <- "American Tobacco Campus"
+  }
+  
+  if(crimes[i, 2] >=  35.974468 && crimes[i, 2] <= 35.976227 
+     && crimes[i, 3] <= 78.879229 && crimes[i, 3] >= -78.882584){
+    crimes[i, 21] <- "Durham Tech"
+  }
+  
+  if(crimes[i, 2] >=  35.971202 && crimes[i, 2] <= 35.976424 
+     && crimes[i, 3] <= -78.893513 && crimes[i, 3] >= -78.900994){
+    crimes[i, 21] <- "NCCU"
+  }
+  
+  if(crimes[i, 2] >=  35.902228 && crimes[i, 2] <= 35.906006 
+     && crimes[i, 3] <= -78.938776 && crimes[i, 3] >= -78.946671){
+    crimes[i, 21] <- "Streets at Southpoint"
+  }
+  if(crimes[i, 2] >= 35.994984 && crimes[i, 2] <= 35.998773
+     && crimes[i, 3] <= -78.897467 && crimes[i, 3] >= -78.905375){
+    crimes[i, 21]  <- "City Center"
+  }
+}
+
+
+# Making column called "downtown" that is a binary variable: 0 represents non-downtown and 1 represents downtown
+
+crimes <- crimes %>% as.data.frame() %>% mutate(downtown = 0)
+
+for(i in 1:nrow(crimes)){
+  if(crimes[i, 2] >= 35.983751 && crimes[i, 2] <= 36.003950
+     && crimes[i, 3] <= -78.873944 && crimes[i, 3] >= -78.912203){
+    crimes[i, 22] <- 1
+  }
+}
+
+firstfourth <- filter(crimes, hour_occur <7)
+secondfourth <- filter(crimes,hour_occur > 6 & hour_occur <13)
+thirdfourth <- filter(crimes,hour_occur > 12 & hour_occur <19)
+fourth <- filter(crimes,hour_occur > 18 & hour_occur <25)
+
+ggplot(firstfourth)+
+  geom_bar(aes(x = hour_occur,fill = chrgdesc), position = position_stack(reverse = TRUE))+
+  coord_flip()+
+  theme(legend.position = "top")+
+  labs(x = "Hour Occurred", y = "Count", title = "Frequency of Crimes per Hour")
+
+ggplot(secondfourth)+
+  geom_bar(aes(x = hour_occur,fill = chrgdesc), position = position_stack(reverse = TRUE))+
+  coord_flip()+
+  theme(legend.position = "top")+
+  labs(x = "Hour Occurred", y = "Count", title = "Frequency of Crimes per Hour")
+
+ggplot(thirdfourth)+
+  geom_bar(aes(x = hour_occur,fill = chrgdesc), position = position_stack(reverse = TRUE))+
+  coord_flip()+
+  theme(legend.position = "top")+
+  labs(x = "Hour Occurred", y = "Count", title = "Frequency of Crimes per Hour")
+
+ggplot(fourth)+
+  geom_bar(aes(x = hour_occur,fill = chrgdesc), position = position_stack(reverse = TRUE))+
+  coord_flip()+
+  theme(legend.position = "top")+
+  labs(x = "Hour Occurred", y = "Count", title = "Frequency of Crimes per Hour")
